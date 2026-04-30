@@ -348,8 +348,10 @@
         <div class="theory-text">
           All four must hold simultaneously:<br><br>
           <b style="color:var(--text)">1. Mutual Exclusion</b> — Resource held by one process at a time<br><br>
-          <b style="color:var(--text)">2. Hold &amp; Wait</b> — Process holds one resource while waiting for another<br><br>
-          <b style="color:var(--text)">3. No Preemption</b> — Resource cannot be taken away forcibly<br><br>
+          <b style="color:var(--text)">2. Hold &amp; Wait</b> — Process holds at least one resource and is waiting to acquire
+          additional resources held by others<br><br>
+          <b style="color:var(--text)">3. No Preemption</b> — Resource cannot be taken away forcibly; it must be released
+          voluntarily by the process holding it<br><br>
           <b style="color:var(--text)">4. Circular Wait</b> — Cycle exists in the RAG (what we detect!)
         </div>
       </div>
