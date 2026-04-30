@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Resource Allocation Graph Visualizer — OS Project</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Outfit:wght@400;500;600;700&display=swap');
+
+  :root {
+    --bg: #0f1117;
+    --bg2: #161b27;
+    --bg3: #1e2535;
+    --border: #2a3147;
+    --border2: #3a4460;
+    --text: #e2e8f0;
+    --text2: #8892a4;
+    --text3: #555f74;
+    --blue: #4f8ef7;
+    --blue-dim: #1a2d52;
+    --green: #3ecf8e;
+    --green-dim: #0d2e20;
+    --red: #f7604f;
+    --red-dim: #3a1015;
+    --amber: #f7a94f;
+    --amber-dim: #3a2510;
+    --purple: #a78bfa;
+    --purple-dim: #1e1540;
+    --font: 'Outfit', sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .logo {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: linear-gradient(135deg, #4f8ef7, #a78bfa);
+    display: flex; align-items: center; justify-content: center; font-size: 18px;
+  }
+  .header-title { font-size: 17px; font-weight: 700; }
+  .header-sub { font-size: 12px; color: var(--text2); margin-top: 1px; font-family: var(--mono); }
+  .badge {
+    padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+    background: var(--blue-dim); color: var(--blue); border: 1px solid var(--blue);
+    letter-spacing: 0.5px; text-transform: uppercase;
+  }
+
+  .main { display: flex; flex: 1; overflow: hidden; }
+
+  .sidebar {
+    width: 240px; min-width: 200px; background: var(--bg2);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow-y: auto;
+  }
+
+  .sidebar-section { padding: 14px 14px 0; }
+  .sidebar-section + .sidebar-section { border-top: 1px solid var(--border); }
+  .section-label {
+    font-size: 10px; font-weight: 700; color: var(--text3); letter-spacing: 1.2px;
+    text-transform: uppercase; margin-bottom: 10px;
+  }
+
+  .tool-btn {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%; padding: 9px 12px; border-radius: 8px;
+    border: 1px solid transparent; background: transparent;
+    color: var(--text2); font-family: var(--font); font-size: 13px;
+    cursor: pointer; margin-bottom: 4px; transition: all 0.15s; text-align: left;
+  }
+  .tool-btn:hover { background: var(--bg3); color: var(--text); border-color: var(--border); }
+  .tool-btn.active { background: var(--blue-dim); color: var(--blue); border-color: var(--blue); font-weight: 600; }
+  .tool-btn.active.green { background: var(--green-dim); color: var(--green); border-color: var(--green); }
+  .tool-btn.active.purple { background: var(--purple-dim); color: var(--purple); border-color: var(--purple); }
+  .tool-btn.active.amber { background: var(--amber-dim); color: var(--amber); border-color: var(--amber); }
+
+  .tool-icon {
+    width: 24px; height: 24px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0;
+  }
+  .icon-p { background: var(--blue-dim); }
+  .icon-r { background: var(--green-dim); }
+  .icon-req { background: var(--purple-dim); }
+  .icon-asgn { background: var(--amber-dim); }
+
+  .action-btn {
+    width: 100%; padding: 8px 12px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--bg3);
+    color: var(--text2); font-family: var(--font); font-size: 13px;
+    cursor: pointer; margin-bottom: 4px; transition: all 0.15s;
+  }
+  .action-btn:hover { border-color: var(--border2); color: var(--text); }
+  .action-btn.red-btn:hover { border-color: var(--red); color: var(--red); background: var(--red-dim); }
+
+  .preset-btn {
+    width: 100%; padding: 8px 12px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--bg3);
+    color: var(--text2); font-family: var(--font); font-size: 12px;
+    cursor: pointer; margin-bottom: 4px; transition: all 0.15s; text-align: left;
+  }
+  .preset-btn:hover { border-color: var(--border2); color: var(--text); }
+
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text2); margin-bottom: 7px; }
+  .leg-circle { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--blue); background: var(--blue-dim); flex-shrink: 0; }
+  .leg-rect { width: 16px; height: 12px; border-radius: 3px; border: 2px solid var(--green); background: var(--green-dim); flex-shrink: 0; }
+  .leg-line { width: 18px; height: 2px; border-radius: 2px; flex-shrink: 0; }
+
+  .sidebar-bottom { margin-top: auto; padding: 14px; border-top: 1px solid var(--border); }
+
+  .canvas-area { flex: 1; display: flex; flex-direction: column; position: relative; }
+  canvas { display: block; flex: 1; width: 100%; height: 100%; cursor: crosshair; }
+
+  .statusbar {
+    padding: 8px 18px; background: var(--bg2); border-top: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px; font-size: 12px;
+  }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; transition: background 0.3s; }
+  .status-safe { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .status-dead { background: var(--red); box-shadow: 0 0 6px var(--red); animation: pulse-red 1s infinite; }
+  .status-neutral { background: var(--text3); }
+
+  @keyframes pulse-red {
+    0%,100% { box-shadow: 0 0 4px var(--red); }
+    50% { box-shadow: 0 0 12px var(--red); }
+  }
+
+  #status-msg { color: var(--text2); flex: 1; }
+
+  .right-panel {
+    width: 270px; background: var(--bg2); border-left: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow-y: auto;
+  }
+
+  .rp-section { padding: 14px; border-bottom: 1px solid var(--border); }
+  .rp-title { font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat-card {
+    background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;
+  }
+  .stat-label { font-size: 10px; color: var(--text3); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat-val { font-size: 22px; font-weight: 700; font-family: var(--mono); }
+  .stat-val.blue { color: var(--blue); }
+  .stat-val.green { color: var(--green); }
+  .stat-val.amber { color: var(--amber); }
+  .stat-val.purple { color: var(--purple); }
+
+  .deadlock-status {
+    padding: 12px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    text-align: center; border: 1px solid; transition: all 0.3s;
+  }
+  .ds-safe { background: var(--green-dim); color: var(--green); border-color: var(--green); }
+  .ds-dead { background: var(--red-dim); color: var(--red); border-color: var(--red); }
+  .ds-neutral { background: var(--bg3); color: var(--text3); border-color: var(--border); }
+
+  .cycle-box {
+    background: var(--red-dim); border: 1px solid var(--red);
+    border-radius: 8px; padding: 10px; display: none; margin-top: 10px;
+  }
+  .cycle-box.show { display: block; }
+  .cycle-title { font-size: 11px; color: var(--red); font-weight: 700; text-transform: uppercase; margin-bottom: 6px; }
+  .cycle-item { font-size: 11px; font-family: var(--mono); color: #f99; margin-bottom: 3px; }
+
+  .theory-box {
+    background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px; margin-bottom: 8px;
+  }
+  .theory-title { font-size: 11px; font-weight: 700; color: var(--blue); margin-bottom: 6px; }
+  .theory-text { font-size: 11px; color: var(--text2); line-height: 1.6; }
+
+  .step-guide { padding: 14px; }
+  .step { display: flex; gap: 10px; margin-bottom: 10px; }
+  .step-num {
+    width: 22px; height: 22px; border-radius: 50%; background: var(--blue-dim);
+    color: var(--blue); font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    border: 1px solid var(--blue);
+  }
+  .step-text { font-size: 11px; color: var(--text2); line-height: 1.6; padding-top: 2px; }
+  .step-text strong { color: var(--text); }
+
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  #tooltip {
+    position: fixed; background: var(--bg3); border: 1px solid var(--border2);
+    color: var(--text); font-size: 12px; padding: 6px 10px; border-radius: 8px;
+    pointer-events: none; display: none; z-index: 99; font-family: var(--font);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  }
+
+  .shortcut {
+    font-family: var(--mono); font-size: 10px; background: var(--bg3);
+    border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; color: var(--text2);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="logo">🔗</div>
+    <div>
+      <div class="header-title">Resource Allocation Graph Visualizer</div>
+      <div class="header-sub">Operating Systems — Deadlock Detection Project</div>
+    </div>
+  </div>
+  <span class="badge">OS Project</span>
+</header>
+
+<div class="main">
+
+  <!-- LEFT SIDEBAR -->
+  <div class="sidebar">
+
+    <div class="sidebar-section" style="padding-bottom:14px">
+      <div class="section-label">Add Nodes</div>
+      <button class="tool-btn active" id="btn-p" onclick="setMode('process')">
+        <span class="tool-icon icon-p">●</span>
+        <span>Add Process <span class="shortcut">P</span></span>
+      </button>
+      <button class="tool-btn" id="btn-r" onclick="setMode('resource')">
+        <span class="tool-icon icon-r">■</span>
+        <span>Add Resource <span class="shortcut">R</span></span>
+      </button>
+    </div>
+
+    <div class="sidebar-section" style="padding-bottom:14px">
+      <div class="section-label">Draw Edges</div>
+      <button class="tool-btn" id="btn-req" onclick="setMode('request')">
+        <span class="tool-icon icon-req">→</span>
+        <span>Request Edge <span class="shortcut">Q</span></span>
+      </button>
+      <small style="font-size:10px;color:var(--text3);padding:0 4px 6px;display:block">Process → Resource (wants)</small>
+      <button class="tool-btn" id="btn-asgn" onclick="setMode('assign')">
+        <span class="tool-icon icon-asgn">←</span>
+        <span>Assignment Edge <span class="shortcut">A</span></span>
+      </button>
+      <small style="font-size:10px;color:var(--text3);padding:0 4px 6px;display:block">Resource → Process (holds)</small>
+    </div>
+
+    <div class="sidebar-section" style="padding-bottom:14px">
+      <div class="section-label">Delete</div>
+      <button class="tool-btn" id="btn-deledge" onclick="setMode('deledge')">
+        <span class="tool-icon" style="background:var(--red-dim);color:var(--red)">✂</span>
+        <span>Delete Edge <span class="shortcut">E</span></span>
+      </button>
+      <small style="font-size:10px;color:var(--text3);padding:0 4px 6px;display:block">Click any arrow to remove it</small>
+      <button class="action-btn" onclick="deleteSelected()">🗑 Delete Node <span class="shortcut">Del</span></button>
+      <button class="action-btn red-btn" onclick="clearAll()">✕ Clear All Canvas</button>
+    </div>
+
+    <div class="sidebar-section" style="padding-bottom:14px">
+      <div class="section-label">Demo Presets</div>
+      <button class="preset-btn" onclick="loadPreset('safe')">✅ Safe State (No Deadlock)</button>
+      <button class="preset-btn" onclick="loadPreset('deadlock2')">⚠ 2-Process Deadlock</button>
+      <button class="preset-btn" onclick="loadPreset('deadlock3')">🔴 3-Process Deadlock</button>
+      <button class="preset-btn" onclick="loadPreset('partial')">🔶 Partial Wait (Safe)</button>
+    </div>
+
+    <div class="sidebar-section" style="padding-bottom:14px">
+      <div class="section-label">Legend</div>
+      <div class="legend-item"><div class="leg-circle"></div> Process node</div>
+      <div class="legend-item"><div class="leg-rect"></div> Resource node</div>
+      <div class="legend-item"><div class="leg-line" style="background:var(--blue)"></div> Request (P→R)</div>
+      <div class="legend-item"><div class="leg-line" style="background:var(--green)"></div> Assignment (R→P)</div>
+      <div class="legend-item"><div class="leg-line" style="background:var(--red)"></div> Deadlock cycle</div>
+      <div class="legend-item"><span style="font-size:13px">✂</span> Delete Edge mode</div>
+    </div>
+
+    <div class="sidebar-bottom">
+      <div style="font-size:11px;color:var(--text3);line-height:1.8">
+        <b style="color:var(--text2)">Shortcuts:</b><br>
+        P = Add Process<br>
+        R = Add Resource<br>
+        Q = Request Edge<br>
+        A = Assignment Edge<br>
+        E = Delete Edge<br>
+        Del = Delete Node<br>
+        Right-click = Delete edge menu
+      </div>
+    </div>
+  </div>
+
+  <!-- CANVAS -->
+  <div class="canvas-area">
+    <canvas id="rag"></canvas>
+    <div class="statusbar">
+      <div class="status-dot status-neutral" id="sdot"></div>
+      <span id="status-msg">Select a tool from the left panel. Click the canvas to add nodes.</span>
+      <span style="color:var(--text3);font-size:11px;margin-left:auto">
+        Nodes: <b id="sc-n" style="color:var(--text)">0</b> &nbsp;
+        Edges: <b id="sc-e" style="color:var(--text)">0</b>
+      </span>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+
+    <div class="rp-section">
+      <div class="rp-title">Graph Statistics</div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Processes</div><div class="stat-val blue" id="sp-count">0</div></div>
+        <div class="stat-card"><div class="stat-label">Resources</div><div class="stat-val green" id="sr-count">0</div></div>
+        <div class="stat-card"><div class="stat-label">Requests</div><div class="stat-val purple" id="seq-count">0</div></div>
+        <div class="stat-card"><div class="stat-label">Assignments</div><div class="stat-val amber" id="sa-count">0</div></div>
+      </div>
+    </div>
+
+    <div class="rp-section">
+      <div class="rp-title">Deadlock Status</div>
+      <div class="deadlock-status ds-neutral" id="dl-status">No graph yet</div>
+      <div class="cycle-box" id="cycle-box">
+        <div class="cycle-title">🔴 Detected Cycles</div>
+        <div id="cycle-list"></div>
+      </div>
+    </div>
+
+    <div class="rp-section">
+      <div class="rp-title">Deadlock Conditions</div>
+      <div class="theory-box">
+        <div class="theory-title">📌 Coffman's 4 Conditions</div>
+        <div class="theory-text">
+          All four must hold simultaneously:<br><br>
+          <b style="color:var(--text)">1. Mutual Exclusion</b> — Resource held by one process at a time<br><br>
+          <b style="color:var(--text)">2. Hold &amp; Wait</b> — Process holds one resource while waiting for another<br><br>
+          <b style="color:var(--text)">3. No Preemption</b> — Resource cannot be taken away forcibly<br><br>
+          <b style="color:var(--text)">4. Circular Wait</b> — Cycle exists in the RAG (what we detect!)
+        </div>
+      </div>
+      <div class="theory-box">
+        <div class="theory-title">🔍 Detection Algorithm</div>
+        <div class="theory-text">
+          Uses <b style="color:var(--text)">Depth First Search (DFS)</b>.<br>
+          If a cycle is found in the directed graph, deadlock exists.<br>
+          Time complexity: <b style="color:var(--blue)">O(V + E)</b>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-guide">
+      <div class="rp-title" style="margin-bottom:12px">How to Demo to Teacher</div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Load <strong>Safe State</strong> — explain no cycle means no deadlock</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Load <strong>2-Process Deadlock</strong> — point to the red cycle edges</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Load <strong>3-Process Deadlock</strong> — show Circular Wait condition</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">Use <strong>Clear All</strong> and build manually step by step</div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-text">Press <strong>E</strong> then click any edge to remove it and show safe state</div></div>
+    </div>
+
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+const canvas = document.getElementById('rag');
+const ctx = canvas.getContext('2d');
+const tooltip = document.getElementById('tooltip');
+
+let nodes = [];
+let edges = [];
+let mode = 'process';
+let selectedNode = null;
+let selectedEdge = -1;
+let hoveredEdgeIdx = -1;
+let edgeStart = null;
+let dragging = null;
+let dragOX = 0, dragOY = 0;
+let pCount = 0, rCount = 0;
+let deadlockCycles = [];
+let mouseX = 0, mouseY = 0;
+let hoverNode = null;
+
+const C = {
+  bgCanvas: '#12172b',
+  grid: 'rgba(255,255,255,0.025)',
+  processFill: '#0e1e3d',
+  processStroke: '#4f8ef7',
+  processText: '#93c5fd',
+  resourceFill: '#0a2018',
+  resourceStroke: '#3ecf8e',
+  resourceText: '#6ee7b7',
+  selected: '#f7a94f',
+  requestCol: '#7c9dff',
+  assignCol: '#3ecf8e',
+  cycleCol: '#f7604f',
+  edgeStart: '#f7a94f',
+};
+
+function resize() {
+  const r = canvas.parentElement.getBoundingClientRect();
+  canvas.width = r.width;
+  canvas.height = r.height - 38;
+  draw();
+}
+new ResizeObserver(resize).observe(canvas.parentElement);
+window.addEventListener('resize', resize);
+
+function setMode(m) {
+  mode = m;
+  edgeStart = null;
+  ['btn-p','btn-r','btn-req','btn-asgn','btn-deledge'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.classList.remove('active','green','purple','amber'); el.style.background=''; el.style.color=''; el.style.borderColor=''; }
+  });
+  const mp = { process:'btn-p', resource:'btn-r', request:'btn-req', assign:'btn-asgn', deledge:'btn-deledge' };
+  const cl = { process:'', resource:'green', request:'purple', assign:'amber', deledge:'' };
+  const el = document.getElementById(mp[m]);
+  if (el) {
+    el.classList.add('active');
+    if (cl[m]) el.classList.add(cl[m]);
+    if (m === 'deledge') { el.style.background='var(--red-dim)'; el.style.color='var(--red)'; el.style.borderColor='var(--red)'; }
+  }
+  updateStatus();
+  draw();
+}
+
+function nodeAt(x, y) {
+  for (let i = nodes.length - 1; i >= 0; i--) {
+    const n = nodes[i];
+    const dx = x - n.x, dy = y - n.y;
+    if (n.type === 'process') { if (dx*dx + dy*dy <= 30*30) return n; }
+    else { if (Math.abs(dx) <= 32 && Math.abs(dy) <= 22) return n; }
+  }
+  return null;
+}
+
+function edgeAt(px, py) {
+  for (let i = edges.length - 1; i >= 0; i--) {
+    const e = edges[i];
+    const fn = findNode(e.from), tn = findNode(e.to);
+    if (!fn || !tn) continue;
+    const fp = getEdgePoint(fn, tn), tp = getEdgePoint(tn, fn);
+    if (distToSegment(px, py, fp.x, fp.y, tp.x, tp.y) < 10) return i;
+  }
+  return -1;
+}
+
+function distToSegment(px, py, ax, ay, bx, by) {
+  const dx = bx-ax, dy = by-ay;
+  const lenSq = dx*dx + dy*dy;
+  if (lenSq === 0) return Math.hypot(px-ax, py-ay);
+  let t = ((px-ax)*dx + (py-ay)*dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (ax+t*dx), py - (ay+t*dy));
+}
+
+function deleteEdge(idx) {
+  if (idx < 0 || idx >= edges.length) return;
+  edges.splice(idx, 1);
+  updateAll();
+}
+
+canvas.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  const r = canvas.getBoundingClientRect();
+  const x = e.clientX - r.left, y = e.clientY - r.top;
+  const ei = edgeAt(x, y);
+  if (ei >= 0) showEdgeMenu(e.clientX, e.clientY, ei);
+});
+
+canvas.addEventListener('mousemove', e => {
+  const r = canvas.getBoundingClientRect();
+  mouseX = e.clientX - r.left;
+  mouseY = e.clientY - r.top;
+  if (dragging) { dragging.x = mouseX - dragOX; dragging.y = mouseY - dragOY; }
+  const h = nodeAt(mouseX, mouseY);
+  if (h !== hoverNode) hoverNode = h;
+
+  hoveredEdgeIdx = (mode === 'deledge' && !h) ? edgeAt(mouseX, mouseY) : -1;
+
+  if (h) {
+    tooltip.style.display = 'block';
+    tooltip.style.left = (e.clientX + 14) + 'px';
+    tooltip.style.top  = (e.clientY - 10) + 'px';
+    const inE  = edges.filter(e2 => e2.to   === h.id);
+    const outE = edges.filter(e2 => e2.from === h.id);
+    if (h.type === 'process') {
+      const waiting = outE.filter(e2=>e2.type==='request').map(e2=>findNode(e2.to)?.label).join(', ')||'none';
+      const holds   = inE.filter(e2=>e2.type==='assign').map(e2=>findNode(e2.from)?.label).join(', ')||'none';
+      tooltip.innerHTML = `<b>${h.label}</b> (Process)<br>Holds: ${holds}<br>Waiting for: ${waiting}`;
+    } else {
+      const assignedTo   = outE.filter(e2=>e2.type==='assign').map(e2=>findNode(e2.to)?.label).join(', ')||'none';
+      const requestedBy  = inE.filter(e2=>e2.type==='request').map(e2=>findNode(e2.from)?.label).join(', ')||'none';
+      tooltip.innerHTML = `<b>${h.label}</b> (Resource)<br>Assigned to: ${assignedTo}<br>Requested by: ${requestedBy}`;
+    }
+  } else { tooltip.style.display = 'none'; }
+  draw();
+});
+
+canvas.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; hoverNode = null; hoveredEdgeIdx = -1; draw(); });
+
+canvas.addEventListener('mousedown', e => {
+  if (e.button !== 0) return;
+  const r = canvas.getBoundingClientRect();
+  const x = e.clientX - r.left, y = e.clientY - r.top;
+  const hit = nodeAt(x, y);
+  hideEdgeMenu();
+
+  if (mode === 'deledge') {
+    const ei = edgeAt(x, y);
+    if (ei >= 0) { deleteEdge(ei); flash('✂ Edge deleted!'); }
+    else if (!hit) flash('⚠ Click directly on an arrow to delete it.');
+    updateStatus(); draw(); return;
+  }
+
+  if (mode === 'process' || mode === 'resource') {
+    if (!hit) { addNode(mode, x, y); selectedNode = null; }
+    else {
+      selectedNode = hit; dragging = hit;
+      dragOX = x - hit.x; dragOY = y - hit.y;
+      nodes.splice(nodes.indexOf(hit), 1);
+      nodes.push(hit);
+    }
+  } else if (mode === 'request') {
+    if (hit) {
+      if (!edgeStart) {
+        if (hit.type === 'process') edgeStart = hit;
+        else flash('⚠ Request edges start from a Process (circle).');
+      } else {
+        if (hit.type === 'resource' && hit !== edgeStart) {
+          if (!edges.find(e2 => e2.from===edgeStart.id && e2.to===hit.id)) addEdge(edgeStart, hit, 'request');
+          edgeStart = null;
+        } else { flash('⚠ Request edge must end at a Resource (square).'); edgeStart = null; }
+      }
+    } else { edgeStart = null; }
+    selectedNode = hit;
+  } else if (mode === 'assign') {
+    if (hit) {
+      if (!edgeStart) {
+        if (hit.type === 'resource') edgeStart = hit;
+        else flash('⚠ Assignment edges start from a Resource (square).');
+      } else {
+        if (hit.type === 'process' && hit !== edgeStart) {
+          if (!edges.find(e2 => e2.from===edgeStart.id && e2.to===hit.id)) addEdge(edgeStart, hit, 'assign');
+          edgeStart = null;
+        } else { flash('⚠ Assignment edge must end at a Process (circle).'); edgeStart = null; }
+      }
+    } else { edgeStart = null; }
+    selectedNode = hit;
+  }
+  updateStatus(); draw();
+});
+
+canvas.addEventListener('mouseup', () => { dragging = null; });
+
+window.addEventListener('keydown', e => {
+  if (['p','P'].includes(e.key)) setMode('process');
+  else if (['r','R'].includes(e.key)) setMode('resource');
+  else if (['q','Q'].includes(e.key)) setMode('request');
+  else if (['a','A'].includes(e.key)) setMode('assign');
+  else if (['e','E'].includes(e.key)) setMode('deledge');
+  else if (e.key === 'Delete' || e.key === 'Backspace') deleteSelected();
+});
+
+function addNode(type, x, y) {
+  const label = type === 'process' ? `P${pCount++}` : `R${rCount++}`;
+  nodes.push({ id: uid(), type, x, y, label });
+  updateAll();
+}
+
+function addEdge(from, to, type) {
+  edges.push({ from: from.id, to: to.id, type });
+  updateAll();
+}
+
+function deleteSelected() {
+  if (!selectedNode) return;
+  edges = edges.filter(e => e.from !== selectedNode.id && e.to !== selectedNode.id);
+  nodes = nodes.filter(n => n !== selectedNode);
+  selectedNode = null; edgeStart = null;
+  updateAll();
+}
+
+function clearAll() {
+  nodes = []; edges = []; selectedNode = null; edgeStart = null;
+  pCount = 0; rCount = 0; deadlockCycles = [];
+  updateAll();
+}
+
+function uid() { return Math.random().toString(36).slice(2,8); }
+function findNode(id) { return nodes.find(n => n.id === id); }
+
+function detectDeadlock() {
+  deadlockCycles = [];
+  const adj = {};
+  nodes.forEach(n => adj[n.id] = []);
+  edges.forEach(e => { if (adj[e.from] !== undefined) adj[e.from].push(e.to); });
+  const visited = {}, recStack = {}, cycles = [];
+
+  function dfs(id, path) {
+    visited[id] = true; recStack[id] = true; path.push(id);
+    for (const nb of (adj[id] || [])) {
+      if (!visited[nb]) dfs(nb, path);
+      else if (recStack[nb]) {
+        const ci = path.indexOf(nb);
+        const cycle = path.slice(ci).map(i => findNode(i)?.label || i).join(' → ');
+        if (!cycles.includes(cycle)) cycles.push(cycle + ' → ' + (findNode(nb)?.label || nb));
+      }
+    }
+    path.pop(); recStack[id] = false;
+  }
+
+  nodes.forEach(n => { if (!visited[n.id]) dfs(n.id, []); });
+  deadlockCycles = cycles;
+  return cycles.length > 0;
+}
+
+function getCycleEdgeSet() {
+  const s = new Set();
+  deadlockCycles.forEach(cyc => {
+    const parts = cyc.split(' → ');
+    const ids = parts.map(l => nodes.find(n=>n.label===l)?.id).filter(Boolean);
+    for (let i = 0; i < ids.length-1; i++) s.add(ids[i]+'→'+ids[i+1]);
+  });
+  return s;
+}
+
+function updateAll() { detectDeadlock(); updatePanel(); updateStatus(); draw(); }
+
+function updatePanel() {
+  document.getElementById('sp-count').textContent  = nodes.filter(n=>n.type==='process').length;
+  document.getElementById('sr-count').textContent  = nodes.filter(n=>n.type==='resource').length;
+  document.getElementById('seq-count').textContent = edges.filter(e=>e.type==='request').length;
+  document.getElementById('sa-count').textContent  = edges.filter(e=>e.type==='assign').length;
+  document.getElementById('sc-n').textContent = nodes.length;
+  document.getElementById('sc-e').textContent = edges.length;
+
+  const hasDead = deadlockCycles.length > 0;
+  const ds = document.getElementById('dl-status');
+  const cb = document.getElementById('cycle-box');
+
+  if (nodes.length === 0) {
+    ds.textContent = 'No graph yet'; ds.className = 'deadlock-status ds-neutral';
+    cb.classList.remove('show');
+  } else if (hasDead) {
+    ds.textContent = '🔴 DEADLOCK DETECTED'; ds.className = 'deadlock-status ds-dead';
+    cb.classList.add('show');
+    document.getElementById('cycle-list').innerHTML =
+      deadlockCycles.map(c => `<div class="cycle-item">↻ ${c}</div>`).join('');
+  } else {
+    ds.textContent = '✅ Safe State — No Deadlock'; ds.className = 'deadlock-status ds-safe';
+    cb.classList.remove('show');
+  }
+}
+
+function updateStatus() {
+  const hasDead = deadlockCycles.length > 0;
+  document.getElementById('sdot').className =
+    'status-dot ' + (nodes.length===0 ? 'status-neutral' : hasDead ? 'status-dead' : 'status-safe');
+  const msgs = {
+    process:  'Mode: Add Process — click empty canvas to place a process (blue circle)',
+    resource: 'Mode: Add Resource — click empty canvas to place a resource (green square)',
+    request:  edgeStart ? `Request from ${edgeStart.label} — click a Resource node` : 'Mode: Request Edge — click a Process, then a Resource',
+    assign:   edgeStart ? `Assignment from ${edgeStart.label} — click a Process node` : 'Mode: Assignment Edge — click a Resource, then a Process',
+    deledge:  'Mode: Delete Edge — hover over any arrow and click it  |  Right-click any edge anytime',
+  };
+  document.getElementById('status-msg').textContent = msgs[mode] || '';
+}
+
+let flashTimer;
+function flash(text) {
+  const msg = document.getElementById('status-msg');
+  const prev = msg.textContent;
+  msg.textContent = text; msg.style.color = 'var(--red)';
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => { msg.textContent = prev; msg.style.color = ''; }, 2500);
+}
+
+function getEdgePoint(node, toward) {
+  const dx = toward.x - node.x, dy = toward.y - node.y;
+  const ang = Math.atan2(dy, dx);
+  if (node.type === 'process') {
+    return { x: node.x + Math.cos(ang)*30, y: node.y + Math.sin(ang)*30 };
+  } else {
+    const W=32, H=22;
+    const tx=Math.cos(ang), ty=Math.sin(ang);
+    const s = Math.min(tx!==0?W/Math.abs(tx):Infinity, ty!==0?H/Math.abs(ty):Infinity);
+    return { x: node.x + tx*s, y: node.y + ty*s };
+  }
+}
+
+function drawArrow(x1, y1, x2, y2, color, glow) {
+  const ang = Math.atan2(y2-y1, x2-x1);
+  const len = Math.hypot(x2-x1, y2-y1);
+  const ex = x1 + Math.cos(ang)*(len-12);
+  const ey = y1 + Math.sin(ang)*(len-12);
+  ctx.save();
+  if (glow) { ctx.shadowColor = color; ctx.shadowBlur = 12; }
+  ctx.strokeStyle = color; ctx.lineWidth = glow ? 2.5 : 1.5;
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(ex,ey); ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(ex+Math.cos(ang)*10, ey+Math.sin(ang)*10);
+  ctx.lineTo(ex+Math.cos(ang+2.5)*6, ey+Math.sin(ang+2.5)*6);
+  ctx.lineTo(ex+Math.cos(ang-2.5)*6, ey+Math.sin(ang-2.5)*6);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+function drawNode(n) {
+  const isSel   = selectedNode === n;
+  const isHov   = hoverNode === n;
+  const isEdge  = edgeStart === n;
+  const inCycle = deadlockCycles.some(c => c.includes(n.label));
+
+  ctx.save();
+  ctx.shadowColor = inCycle ? C.cycleCol : isEdge ? C.edgeStart : (n.type==='process' ? C.processStroke : C.resourceStroke);
+  ctx.shadowBlur  = (isSel||isEdge||inCycle) ? 18 : isHov ? 12 : 6;
+
+  const strokeColor = inCycle ? C.cycleCol : isEdge ? C.edgeStart : isSel ? C.selected :
+                      (n.type==='process' ? C.processStroke : C.resourceStroke);
+
+  if (n.type === 'process') {
+    if (inCycle) {
+      ctx.beginPath(); ctx.arc(n.x, n.y, 34, 0, Math.PI*2);
+      ctx.strokeStyle = C.cycleCol+'44'; ctx.lineWidth=2; ctx.setLineDash([4,3]); ctx.stroke(); ctx.setLineDash([]);
+    }
+    ctx.beginPath(); ctx.arc(n.x, n.y, 30, 0, Math.PI*2);
+    ctx.fillStyle = isHov ? '#122240' : C.processFill; ctx.fill();
+    ctx.strokeStyle = strokeColor; ctx.lineWidth = isSel||isEdge ? 2.5 : 1.5; ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = C.processText;
+    ctx.font = 'bold 13px Outfit, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(n.label, n.x, n.y);
+  } else {
+    const W=64, H=44, rx=8, x=n.x-W/2, y=n.y-H/2;
+    if (inCycle) {
+      roundRect(ctx, x-4, y-4, W+8, H+8, rx+2);
+      ctx.strokeStyle = C.cycleCol+'44'; ctx.lineWidth=2; ctx.setLineDash([4,3]); ctx.stroke(); ctx.setLineDash([]);
+    }
+    roundRect(ctx, x, y, W, H, rx);
+    ctx.fillStyle = isHov ? '#0c2516' : C.resourceFill; ctx.fill();
+    ctx.strokeStyle = strokeColor; ctx.lineWidth = isSel||isEdge ? 2.5 : 1.5; ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.beginPath(); ctx.arc(n.x, n.y-7, 5, 0, Math.PI*2);
+    ctx.fillStyle = C.resourceStroke+'99'; ctx.fill();
+    ctx.fillStyle = C.resourceText;
+    ctx.font = 'bold 12px Outfit, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(n.label, n.x, n.y+8);
+  }
+  ctx.restore();
+}
+
+function roundRect(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x+r,y); c.lineTo(x+w-r,y); c.quadraticCurveTo(x+w,y,x+w,y+r);
+  c.lineTo(x+w,y+h-r); c.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  c.lineTo(x+r,y+h); c.quadraticCurveTo(x,y+h,x,y+h-r);
+  c.lineTo(x,y+r); c.quadraticCurveTo(x,y,x+r,y); c.closePath();
+}
+
+function draw() {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = C.bgCanvas; ctx.fillRect(0,0,W,H);
+
+  ctx.strokeStyle = C.grid; ctx.lineWidth = 0.5;
+  for (let x=0; x<W; x+=36) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for (let y=0; y<H; y+=36) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+  const cycleSet = getCycleEdgeSet();
+
+  edges.forEach((e, idx) => {
+    const fn = findNode(e.from), tn = findNode(e.to);
+    if (!fn || !tn) return;
+    const fp = getEdgePoint(fn, tn), tp = getEdgePoint(tn, fn);
+    const isCyc     = cycleSet.has(e.from+'→'+e.to);
+    const isHovEdge = hoveredEdgeIdx === idx;
+    let col = isCyc ? C.cycleCol : (e.type==='request' ? C.requestCol : C.assignCol);
+    if (isHovEdge && mode === 'deledge') col = '#f7604f';
+    drawArrow(fp.x, fp.y, tp.x, tp.y, col, isCyc || isHovEdge);
+
+    const mx=(fp.x+tp.x)/2, my=(fp.y+tp.y)/2;
+    ctx.save();
+    ctx.font = '10px JetBrains Mono, monospace';
+    ctx.fillStyle = isCyc ? C.cycleCol : (e.type==='request' ? '#7c9dff88' : '#3ecf8e88');
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(e.type==='request' ? 'req' : 'asgn', mx, my-8);
+    if (isHovEdge && mode === 'deledge') {
+      ctx.fillStyle = '#f7604f'; ctx.font = 'bold 12px Outfit, sans-serif';
+      ctx.fillText('✂ click to delete', mx, my+12);
+    }
+    ctx.restore();
+  });
+
+  if (edgeStart && (mouseX || mouseY)) {
+    const fp = getEdgePoint(edgeStart, {x:mouseX,y:mouseY});
+    ctx.save(); ctx.strokeStyle = C.edgeStart; ctx.lineWidth=1.5; ctx.setLineDash([6,4]);
+    ctx.beginPath(); ctx.moveTo(fp.x,fp.y); ctx.lineTo(mouseX,mouseY); ctx.stroke();
+    ctx.setLineDash([]); ctx.restore();
+  }
+
+  nodes.forEach(drawNode);
+
+  if (nodes.length === 0) {
+    ctx.save();
+    ctx.font = '15px Outfit, sans-serif'; ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('Select a tool and click here to start building your graph', W/2, H/2-10);
+    ctx.font = '12px Outfit, sans-serif'; ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    ctx.fillText('or load a preset from the left panel', W/2, H/2+18);
+    ctx.restore();
+  }
+}
+
+function showEdgeMenu(clientX, clientY, edgeIdx) {
+  let menu = document.getElementById('edge-ctx-menu');
+  if (!menu) {
+    menu = document.createElement('div');
+    menu.id = 'edge-ctx-menu';
+    menu.style.cssText = `position:fixed;background:var(--bg3);border:1px solid var(--border2);
+      border-radius:10px;padding:6px;z-index:200;box-shadow:0 6px 24px rgba(0,0,0,0.5);
+      font-family:var(--font);min-width:170px;`;
+    document.body.appendChild(menu);
+  }
+  const e = edges[edgeIdx];
+  if (!e) return;
+  const fn = findNode(e.from), tn = findNode(e.to);
+  const label = fn && tn ? `${fn.label} → ${tn.label}` : 'edge';
+  const typeLabel = e.type==='request' ? '🔵 Request' : '🟢 Assignment';
+  menu.innerHTML = `
+    <div style="font-size:11px;color:var(--text3);padding:4px 8px 6px;border-bottom:1px solid var(--border);margin-bottom:4px">
+      ${typeLabel} edge<br><b style="color:var(--text)">${label}</b>
+    </div>
+    <div id="ctx-del-btn" style="padding:7px 12px;border-radius:7px;cursor:pointer;font-size:13px;
+      color:var(--red);display:flex;align-items:center;gap:8px;"
+      onmouseenter="this.style.background='var(--red-dim)'"
+      onmouseleave="this.style.background=''">✂ Delete this edge</div>
+    <div style="padding:7px 12px;border-radius:7px;cursor:pointer;font-size:13px;
+      color:var(--text2);display:flex;align-items:center;gap:8px;"
+      onmouseenter="this.style.background='var(--bg2)'"
+      onmouseleave="this.style.background=''"
+      onclick="hideEdgeMenu()">✕ Cancel</div>`;
+  menu.style.left = clientX+'px';
+  menu.style.top  = clientY+'px';
+  menu.style.display = 'block';
+  document.getElementById('ctx-del-btn').onclick = () => { deleteEdge(edgeIdx); hideEdgeMenu(); flash('✂ Edge deleted!'); };
+  setTimeout(() => { document.addEventListener('mousedown', hideEdgeMenu, { once:true }); }, 50);
+}
+
+function hideEdgeMenu() {
+  const m = document.getElementById('edge-ctx-menu');
+  if (m) m.style.display = 'none';
+}
+
+function loadPreset(name) {
+  clearAll();
+  const cx = canvas.width/2, cy = canvas.height/2;
+  if (name === 'safe') {
+    const p0=mk('process',cx-180,cy-80,'P0'), p1=mk('process',cx-180,cy+80,'P1');
+    const r0=mk('resource',cx+60,cy-80,'R0'), r1=mk('resource',cx+60,cy+80,'R1');
+    nodes=[p0,p1,r0,r1]; pCount=2; rCount=2;
+    edges=[{from:p0.id,to:r0.id,type:'request'},{from:r1.id,to:p0.id,type:'assign'},{from:r0.id,to:p1.id,type:'assign'}];
+  } else if (name === 'deadlock2') {
+    const p0=mk('process',cx-140,cy,'P0'), p1=mk('process',cx+140,cy,'P1');
+    const r0=mk('resource',cx,cy-110,'R0'), r1=mk('resource',cx,cy+110,'R1');
+    nodes=[p0,p1,r0,r1]; pCount=2; rCount=2;
+    edges=[{from:r0.id,to:p0.id,type:'assign'},{from:p0.id,to:r1.id,type:'request'},
+           {from:r1.id,to:p1.id,type:'assign'},{from:p1.id,to:r0.id,type:'request'}];
+  } else if (name === 'deadlock3') {
+    const p0=mk('process',cx-200,cy-80,'P0'), p1=mk('process',cx+200,cy-80,'P1'), p2=mk('process',cx,cy+120,'P2');
+    const r0=mk('resource',cx,cy-140,'R0'), r1=mk('resource',cx-200,cy+80,'R1'), r2=mk('resource',cx+200,cy+80,'R2');
+    nodes=[p0,p1,p2,r0,r1,r2]; pCount=3; rCount=3;
+    edges=[{from:p0.id,to:r0.id,type:'request'},{from:r0.id,to:p1.id,type:'assign'},
+           {from:p1.id,to:r2.id,type:'request'},{from:r2.id,to:p2.id,type:'assign'},
+           {from:p2.id,to:r1.id,type:'request'},{from:r1.id,to:p0.id,type:'assign'}];
+  } else if (name === 'partial') {
+    const p0=mk('process',cx-180,cy-80,'P0'), p1=mk('process',cx-180,cy+80,'P1'), p2=mk('process',cx+30,cy,'P2');
+    const r0=mk('resource',cx+200,cy-80,'R0'), r1=mk('resource',cx+200,cy+80,'R1');
+    nodes=[p0,p1,p2,r0,r1]; pCount=3; rCount=2;
+    edges=[{from:r0.id,to:p0.id,type:'assign'},{from:p0.id,to:r1.id,type:'request'},
+           {from:r1.id,to:p1.id,type:'assign'},{from:p2.id,to:r0.id,type:'request'}];
+  }
+  updateAll();
+}
+
+function mk(type, x, y, label) { return { id: uid(), type, x, y, label }; }
+
+resize();
+loadPreset('deadlock3');
+</script>
+</body>
+</html>
